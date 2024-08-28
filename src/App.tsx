@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { ChangeEvent, useCallback, useMemo, useState, MouseEvent } from 'react'
 import './App.css'
 import { Web3Repository } from './adapters/outbound/Web3Repository';
 import { TokenController } from './adapters/inbound/TokenController';
@@ -9,64 +9,110 @@ import { TransferBnbTokenUseCase } from './core/application/usecases/TransferBnb
 import { GetBnbBalanceUseCase } from './core/application/usecases/GetBnbBalanceUseCase';
 
 export default function App() {
-  const [address, setAddress] = useState("<SUA CARTEIRA>");
-  const [contract, setContract] = useState("BNB");
-  const [balance, setBalance] = useState('');
-  const [toAddress, setToAddress] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [message, setMessage] = useState('');
+     // Estado único para armazenar todos os valores
+  const [state, setState] = useState({
+    address: '<SUA CARTEIRA>',
+    contract: 'BNB',
+    balance: '',
+    toAddress: '',
+    quantity: '',
+    message: ''
+  });
 
-  async function checkBalance() {
-    try{
-      const balance = await tokenController.getTokenBalance(address, contract);
-      setBalance(balance);
-    } catch (error: any) {
-      setMessage(`Error: ${error.message}`);
-    }
-  }
+  // Memoized version of the contract options to avoid re-rendering
+  const contractOptions = useMemo(() => [
+    { label: 'BNB', value: 'BNB' },
+    { label: 'BTC', value: '0x53598858bC64f5f798B3AcB7F82FF2CB2aF463bf' },
+    { label: 'ETH', value: '0xd66c6B4F0be8CE5b39D52E0Fd1344c389929B378' },
+    { label: 'USDC', value: '0x64544969ed7EBf5f083679233325356EbE738930' },
+  ], []);
 
-  async function transfer() {
+  // Função genérica para atualizar o estado
+  const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = event.target;
+    setState(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+  }, []);
+
+  // Função para checar o saldo
+  const handleCheckBalanceClick = useCallback(async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
     try {
-      const transactionHash = await tokenController.transferToken(toAddress, contract, quantity);
-      setMessage(`Transaction successful: ${transactionHash}`);
+      const balance = await tokenController.getTokenBalance(state.address, state.contract);
+      setState(prevState => ({ ...prevState, balance }));
     } catch (error: any) {
-      setMessage(`Error: ${error.message}`);
+      setState(prevState => ({ ...prevState, message: `Error: ${error.message}` }));
     }
-  }
+  }, [state.address, state.contract]);
+
+  // Função para transferir tokens
+  const handleTransferClick = useCallback(async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    try {
+      const transactionHash = await tokenController.transferToken(state.toAddress, state.contract, state.quantity);
+      setState(prevState => ({ ...prevState, message: `Transaction successful: ${transactionHash}` }));
+    } catch (error: any) {
+      setState(prevState => ({ ...prevState, message: `Error: ${error.message}` }));
+    }
+  }, [state.toAddress, state.contract, state.quantity]);
 
   return (
     <div>
       <p>
-        My Address : <input type="text" onChange={evt => setAddress(evt.target.value)} value={address} />
+        My Address:
+        <input
+          type="text"
+          name="address"
+          onChange={handleInputChange}
+          value={state.address}
+        />
       </p>
       <p>
-        <select className="form-select" onChange={evt => setContract(evt.target.value)}>
-          <option value="BNB">BNB</option>
-          <option value="0x53598858bC64f5f798B3AcB7F82FF2CB2aF463bf">BTC</option>
-          <option value="0xd66c6B4F0be8CE5b39D52E0Fd1344c389929B378">ETH</option>
-          <option value="0x64544969ed7EBf5f083679233325356EbE738930">USDC</option>
+        <select
+          className="form-select"
+          name="contract"
+          onChange={handleInputChange}
+          value={state.contract}
+        >
+          {contractOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
-        <input type="button" value="See Balance" onClick={evt => checkBalance()} />
+        {/* Alterado para button */}
+        <button onClick={handleCheckBalanceClick}>See Balance</button>
       </p>
-      <p>
-        Balance: {balance}
-      </p>
+      <p>Balance: {state.balance}</p>
       <hr />
       <p>
-        To Address: <input type="text" onChange={evt => setToAddress(evt.target.value)} value={toAddress} />
+        To Address:
+        <input
+          type="text"
+          name="toAddress"
+          onChange={handleInputChange}
+          value={state.toAddress}
+        />
       </p>
       <p>
-        Qty: <input type="text" onChange={evt => setQuantity(evt.target.value)} value={quantity} />
+        Qty:
+        <input
+          type="text"
+          name="quantity"
+          onChange={handleInputChange}
+          value={state.quantity}
+        />
       </p>
       <p>
-        <input type="button" value="Transfer" onClick={transfer} />
+        {/* Alterado para button */}
+        <button onClick={handleTransferClick}>Transfer</button>
       </p>
       <hr />
-      <p>
-        {message}
-      </p>
+      <p>{state.message}</p>
     </div>
-  )
+  );
 }
 
 const web3Repository = new Web3Repository();
