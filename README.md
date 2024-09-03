@@ -1,4 +1,4 @@
-# Braze Wallet - Clean Arch
+# Brave Wallet - Clean Arch
 
 ## Visão Geral
 
